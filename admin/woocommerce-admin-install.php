@@ -279,6 +279,7 @@ CREATE TABLE {$wpdb->prefix}woocommerce_termmeta (
   KEY meta_key (meta_key)
 ) $collate;
 CREATE TABLE {$wpdb->prefix}woocommerce_downloadable_product_permissions (
+  permission_id bigint(20) NOT NULL auto_increment,
   download_id varchar(32) NOT NULL,
   product_id bigint(20) NOT NULL,
   order_id bigint(20) NOT NULL DEFAULT 0,
@@ -289,7 +290,7 @@ CREATE TABLE {$wpdb->prefix}woocommerce_downloadable_product_permissions (
   access_granted datetime NOT NULL default '0000-00-00 00:00:00',
   access_expires datetime NULL default null,
   download_count bigint(20) NOT NULL DEFAULT 0,
-  PRIMARY KEY  (product_id,order_id,order_key,download_id),
+  PRIMARY KEY  (permission_id),
   KEY download_order_product (download_id,order_id,product_id)
 ) $collate;
 CREATE TABLE {$wpdb->prefix}woocommerce_order_items (
