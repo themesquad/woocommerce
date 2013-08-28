@@ -40,7 +40,7 @@
 		</tr>
 		<tr>
 			<td><?php _e( 'Web Server Info','woocommerce' ); ?>:</td>
-			<td><?php echo esc_html( $_SERVER['SERVER_SOFTWARE'] );  ?></td>
+			<td><?php echo esc_html( $_SERVER['SERVER_SOFTWARE'] ); ?></td>
 		</tr>
 		<tr>
 			<td><?php _e( 'PHP Version','woocommerce' ); ?>:</td>
@@ -63,8 +63,12 @@
 			?></td>
 		</tr>
 		<tr>
-			<td><?php _e( 'WP Debug Mode','woocommerce' ); ?>:</td>
+			<td><?php _e( 'WP Debug Mode', 'woocommerce' ); ?>:</td>
 			<td><?php if ( defined('WP_DEBUG') && WP_DEBUG ) echo '<mark class="yes">' . __( 'Yes', 'woocommerce' ) . '</mark>'; else echo '<mark class="no">' . __( 'No', 'woocommerce' ) . '</mark>'; ?></td>
+		</tr>
+		<tr>
+			<td><?php _e( 'WP Language', 'woocommerce' ); ?>:</td>
+			<td><?php if ( defined( 'WPLANG' ) && WPLANG ) echo WPLANG; else  _e( 'Default', 'woocommerce' ); ?></td>
 		</tr>
 		<tr>
 			<td><?php _e( 'WP Max Upload Size','woocommerce' ); ?>:</td>
@@ -96,6 +100,17 @@
 				else
 					echo '<mark class="error">' . __( 'Log directory (<code>woocommerce/logs/</code>) is not writable. Logging will not be possible.', 'woocommerce' ) . '</mark>';
 			?></td>
+		</tr>
+		<tr>
+			<td><?php _e( 'Default Timezone','woocommerce' ); ?>:</td>
+			<td><?php
+				$default_timezone = date_default_timezone_get();
+				if ( 'UTC' !== $default_timezone ) {
+					echo '<mark class="error">' . sprintf( __( 'Default timezone is %s - it should be UTC', 'woocommerce' ), $default_timezone ) . '</mark>';
+				} else {
+					echo '<mark class="yes">' . sprintf( __( 'Default timezone is %s', 'woocommerce' ), $default_timezone ) . '</mark>';
+				} ?>
+			</td>
 		</tr>
 		<?php
 			$posting = array();

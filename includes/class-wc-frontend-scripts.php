@@ -14,6 +14,33 @@ class WC_Frontend_Scripts {
 	}
 
 	/**
+	 * Get styles for the frontend
+	 * @return array
+	 */
+	public static function get_styles() {
+		return apply_filters( 'woocommerce_enqueue_styles', array(
+			'woocommerce-layout' => array(
+				'src'     => str_replace( array( 'http:', 'https:' ), '', WC()->plugin_url() ) . '/assets/css/woocommerce-layout.css',
+				'deps'    => '',
+				'version' => WOOCOMMERCE_VERSION,
+				'media'   => ''
+			),
+			'woocommerce-smallscreen' => array(
+				'src'     => str_replace( array( 'http:', 'https:' ), '', WC()->plugin_url() ) . '/assets/css/woocommerce-smallscreen.css',
+				'deps'    => 'woocommerce-layout',
+				'version' => WOOCOMMERCE_VERSION,
+				'media'   => 'only screen and (max-width: ' . apply_filters( 'woocommerce_style_smallscreen_breakpoint', $breakpoint = '768px' ) . ')'
+			),
+			'woocommerce-general' => array(
+				'src'     => str_replace( array( 'http:', 'https:' ), '', WC()->plugin_url() ) . '/assets/css/woocommerce.css',
+				'deps'    => '',
+				'version' => WOOCOMMERCE_VERSION,
+				'media'   => ''
+			),
+		) );
+	}
+
+	/**
 	 * Register/queue frontend scripts.
 	 *
 	 * @access public
@@ -114,31 +141,12 @@ class WC_Frontend_Scripts {
 		) ) );
 
 		wp_localize_script( 'wc-country-select', 'wc_country_select_params', apply_filters( 'wc_country_select_params', array(
-			'countries'                        => json_encode( WC()->countries->get_allowed_country_states() ),
+			'countries'                        => json_encode( array_merge( WC()->countries->get_allowed_country_states(), WC()->countries->get_shipping_country_states() ) ),
 			'i18n_select_state_text'           => esc_attr__( 'Select an option&hellip;', 'woocommerce' ),
 		) ) );
 
 		// CSS Styles
-		$enqueue_styles = apply_filters( 'woocommerce_enqueue_styles', array(
-			'woocommerce-layout' => array(
-				'src'     => $assets_path . 'css/woocommerce-layout.css',
-				'deps'    => '',
-				'version' => WOOCOMMERCE_VERSION,
-				'media'   => ''
-			),
-			'woocommerce-smallscreen' => array(
-				'src'     => $assets_path . 'css/woocommerce-smallscreen.css',
-				'deps'    => 'woocommerce-layout',
-				'version' => WOOCOMMERCE_VERSION,
-				'media'   => 'only screen and (max-width: ' . apply_filters( 'woocommerce_style_smallscreen_breakpoint', $breakpoint = '768px' ) . ')'
-			),
-			'woocommerce-general' => array(
-				'src'     => $assets_path . 'css/woocommerce.css',
-				'deps'    => '',
-				'version' => WOOCOMMERCE_VERSION,
-				'media'   => ''
-			),
-		) );
+		$enqueue_styles = $this->get_styles();
 
 		if ( $enqueue_styles )
 			foreach ( $enqueue_styles as $handle => $args )
@@ -158,7 +166,7 @@ class WC_Frontend_Scripts {
 		global $wp_scripts;
 
 		// Enforce minimum version of jQuery
-		if ( ! empty( $wp_scripts->registered['jquery']->ver ) && ! empty( $wp_scripts->registered['jquery']->src ) && $wp_scripts->registered['jquery']->ver < '1.7' ) {
+		if ( ! empty( $wp_scripts->registered['jquery']->ver ) && ! empty( $wp_scripts->registered['jquery']->src ) && 0 >= version_compare( $wp_scripts->registered['jquery']->ver, '1.7' ) ) {
 			wp_deregister_script( 'jquery' );
 			wp_register_script( 'jquery', '/wp-includes/js/jquery/jquery.js', array(), '1.7' );
 			wp_enqueue_script( 'jquery' );

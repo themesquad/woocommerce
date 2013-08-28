@@ -3,7 +3,7 @@ Contributors: woothemes, mikejolley, jameskoster, CoenJacobs
 Tags: ecommerce, e-commerce, commerce, woothemes, wordpress ecommerce, affiliate, store, sales, sell, shop, shopping, cart, checkout, configurable, variable, widgets, reports, download, downloadable, digital, inventory, stock, reports, shipping, tax
 Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=paypal@woothemes.com&item_name=Donation+for+WooCommerce
 Requires at least: 3.5
-Tested up to: 3.6 beta 3
+Tested up to: 3.6
 Stable tag: 2.0.13
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -175,6 +175,12 @@ Yes you can! Join in on our [GitHub repository](http://github.com/woothemes/wooc
 * Feature - Reports - New design, export csvs, more data.
 * Feature - Ability to link past orders to a customer (before they registered).
 * Feature - Authorize option for paypal standard.
+* Feature - Separate options for countries you can ship to and sell to.
+* Feature - BACS supports multiple account details.
+* Feature - PayPal PDT support (as alternative to IPN).
+* Feature - Handling for password protected products.
+* Feature - Schema markup selector for downloadables.
+* Tweak - Added pagination to tax rate screens.
 * Tweak - Added filter to check the 'Create account' checkbox on checkout by default.
 * Tweak - Update CPT parameters for 'product_variation' and 'shop_coupon' to be no longer public.
 * Tweak - COD processing instead of on-hold.
@@ -190,6 +196,7 @@ Yes you can! Join in on our [GitHub repository](http://github.com/woothemes/wooc
 * Tweak - Order details optimised for small screens.
 * Tweak - Streamlined account process - username and passwords are optional and can be automatically generated.
 * Tweak - Updated/new dummy data (including .csv files to be used with [Product CSV Import Suite](http://www.woothemes.com/products/product-csv-import-suite/)).
+* Tweak - Product shortcodes columns paramter now affects layout correctly.
 * Fix - Changed MyException to Exception in Checkout class as MyException class does not exist in WooCommerce
 * Fix - Default cart widget styling on non-wc pages.
 * Fix - Rounding for mijireh tax ex. price.

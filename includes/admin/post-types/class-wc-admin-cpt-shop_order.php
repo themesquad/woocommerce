@@ -26,6 +26,9 @@ class WC_Admin_CPT_Shop_Order extends WC_Admin_CPT {
 	public function __construct() {
 		$this->type = 'shop_order';
 
+		// Before data updates
+		add_filter( 'wp_insert_post_data', array( $this, 'wp_insert_post_data' ) );
+
 		// Admin Columns
 		add_filter( 'manage_edit-' . $this->type . '_columns', array( $this, 'edit_columns' ) );
 		add_action( 'manage_' . $this->type . '_posts_custom_column', array( $this, 'custom_columns' ), 2 );
@@ -33,7 +36,7 @@ class WC_Admin_CPT_Shop_Order extends WC_Admin_CPT {
 		// Views and filtering
 		add_filter( 'views_edit-shop_order', array( $this, 'custom_order_views' ) );
 		add_filter( 'bulk_actions-edit-shop_order', array( $this, 'bulk_actions' ) );
-		add_filter( 'post_row_actions', array( $this, 'remove_row_actions', 10, 1 ) );
+		add_filter( 'post_row_actions', array( $this, 'remove_row_actions' ), 10, 1 );
 		add_action( 'restrict_manage_posts', array( $this, 'restrict_manage_orders' ) );
 		add_filter( 'request', array( $this, 'orders_by_customer_query' ) );
 		add_filter( "manage_edit-shop_order_sortable_columns", array( $this, 'custom_shop_order_sort' ) );
@@ -43,10 +46,35 @@ class WC_Admin_CPT_Shop_Order extends WC_Admin_CPT {
 		add_filter( 'query_vars', array( $this, 'add_custom_query_var' ) );
 		add_action( 'before_delete_post', array( $this, 'delete_order_items' ) );
 
+		// Bulk edit
+		add_action( 'admin_footer', array( $this, 'bulk_admin_footer' ), 10 );
+		add_action( 'load-edit.php', array( $this, 'bulk_action' ) );
+		add_action( 'admin_notices', array( $this, 'bulk_admin_notices' ) );
+
 		// Call WC_Admin_CPT constructor
 		parent::__construct();
 	}
 
+	/**
+	 * Forces the order posts to have a title in a certain format (containing the date)
+	 *
+	 * @param array $data
+	 * @return array
+	 */
+	public function wp_insert_post_data( $data ) {
+		global $post;
+
+		if ( $data['post_type'] == 'shop_order' && isset( $data['post_date'] ) ) {
+
+			$order_title = 'Order';
+			if ( $data['post_date'] )
+				$order_title.= ' &ndash; ' . date_i18n( 'F j, Y @ h:i A', strtotime( $data['post_date'] ) );
+
+			$data['post_title'] = $order_title;
+		}
+
+		return $data;
+	}
 
 	/**
 	 * Change the columns shown in admin.
@@ -134,7 +162,7 @@ class WC_Admin_CPT_Shop_Order extends WC_Admin_CPT {
 						<tr>
 							<td class="qty"><?php echo absint( $item['qty'] ); ?></td>
 							<td class="name">
-								<?php if ( get_option( 'woocommerce_enable_sku', true ) !== 'no' && $_product && $_product->get_sku() ) echo $_product->get_sku() . ' - '; ?><?php echo apply_filters( 'woocommerce_order_item_name', $item['name'], $item ); ?>
+								<?php if ( wc_product_sku_enabled() && $_product && $_product->get_sku() ) echo $_product->get_sku() . ' - '; ?><?php echo apply_filters( 'woocommerce_order_item_name', $item['name'], $item ); ?>
 								<?php if ( $item_meta_html ) : ?>
 									<a class="tips" href="#" data-tip="<?php echo esc_attr( $item_meta_html ); ?>">[?]</a>
 								<?php endif; ?>
@@ -153,8 +181,8 @@ class WC_Admin_CPT_Shop_Order extends WC_Admin_CPT {
 	        	else
 	        		echo '&ndash;';
 
-	        	if ( $the_order->shipping_method_title )
-	        		echo '<small class="meta">' . __( 'Via', 'woocommerce' ) . ' ' . esc_html( $the_order->shipping_method_title ) . '</small>';
+	        	if ( $the_order->get_shipping_method() )
+	        		echo '<small class="meta">' . __( 'Via', 'woocommerce' ) . ' ' . esc_html( $the_order->get_shipping_method() ) . '</small>';
 
 			break;
 			case "order_notes" :
@@ -489,7 +517,7 @@ class WC_Admin_CPT_Shop_Order extends WC_Admin_CPT {
 		if ( 'edit.php' != $pagenow || empty( $wp->query_vars['s'] ) || $wp->query_vars['post_type'] != 'shop_order' )
 			return $wp;
 
-		$search_fields = array_map( 'esc_attr', apply_filters( 'woocommerce_shop_order_search_fields', array(
+		$search_fields = array_map( 'woocommerce_clean', apply_filters( 'woocommerce_shop_order_search_fields', array(
 			'_order_key',
 			'_billing_first_name',
 			'_billing_last_name',
@@ -501,7 +529,15 @@ class WC_Admin_CPT_Shop_Order extends WC_Admin_CPT {
 			'_billing_country',
 			'_billing_state',
 			'_billing_email',
-			'_billing_phone'
+			'_billing_phone',
+			'_shipping_first_name',
+			'_shipping_last_name',
+			'_shipping_address_1',
+			'_shipping_address_2',
+			'_shipping_city',
+			'_shipping_postcode',
+			'_shipping_country',
+			'_shipping_state'
 		) ) );
 
 		$search_order_id = str_replace( 'Order #', '', $_GET['s'] );
@@ -588,6 +624,97 @@ class WC_Admin_CPT_Shop_Order extends WC_Admin_CPT {
 				JOIN {$wpdb->prefix}woocommerce_order_itemmeta ON {$wpdb->prefix}woocommerce_order_items.order_item_id = {$wpdb->prefix}woocommerce_order_itemmeta.order_item_id
 				WHERE {$wpdb->prefix}woocommerce_order_items.order_id = '{$postid}';
 				" );
+		}
+	}
+
+	/**
+	 * Add extra bulk action options to mark orders as complete or processing
+	 *
+	 * Using Javascript until WordPress core fixes: http://core.trac.wordpress.org/ticket/16031
+	 *
+	 * @access public
+	 * @return void
+	 */
+	public function bulk_admin_footer() {
+		global $post_type;
+
+		if ( 'shop_order' == $post_type ) {
+			?>
+			<script type="text/javascript">
+			jQuery(document).ready(function() {
+				jQuery('<option>').val('mark_processing').text('<?php _e( 'Mark processing', 'woocommerce' )?>').appendTo("select[name='action']");
+				jQuery('<option>').val('mark_processing').text('<?php _e( 'Mark processing', 'woocommerce' )?>').appendTo("select[name='action2']");
+
+				jQuery('<option>').val('mark_on-hold').text('<?php _e( 'Mark on-hold', 'woocommerce' )?>').appendTo("select[name='action']");
+				jQuery('<option>').val('mark_on-hold').text('<?php _e( 'Mark on-hold', 'woocommerce' )?>').appendTo("select[name='action2']");
+
+				jQuery('<option>').val('mark_completed').text('<?php _e( 'Mark completed', 'woocommerce' )?>').appendTo("select[name='action']");
+				jQuery('<option>').val('mark_completed').text('<?php _e( 'Mark completed', 'woocommerce' )?>').appendTo("select[name='action2']");
+			});
+			</script>
+			<?php
+		}
+	}
+
+	/**
+	 * Process the new bulk actions for changing order status
+	 *
+	 * @access public
+	 * @return void
+	 */
+	public function bulk_action() {
+		$wp_list_table = _get_list_table( 'WP_Posts_List_Table' );
+		$action = $wp_list_table->current_action();
+
+		switch ( $action ) {
+			case 'mark_completed':
+				$new_status = 'completed';
+				$report_action = 'marked_completed';
+				break;
+			case 'mark_processing':
+				$new_status = 'processing';
+				$report_action = 'marked_processing';
+				break;
+			case 'mark_on-hold' :
+				$new_status = 'on-hold';
+				$report_action = 'marked_on-hold';
+				break;
+			break;
+			default:
+				return;
+		}
+
+		$changed = 0;
+
+		$post_ids = array_map( 'absint', (array) $_REQUEST['post'] );
+
+		foreach( $post_ids as $post_id ) {
+			$order = new WC_Order( $post_id );
+			$order->update_status( $new_status, __( 'Order status changed by bulk edit:', 'woocommerce' ) );
+			$changed++;
+		}
+
+		$sendback = add_query_arg( array( 'post_type' => 'shop_order', $report_action => true, 'changed' => $changed, 'ids' => join( ',', $post_ids ) ), '' );
+		wp_redirect( $sendback );
+		exit();
+	}
+
+	/**
+	 * Show confirmation message that order status changed for number of orders
+	 *
+	 * @access public
+	 * @return void
+	 */
+	public function bulk_admin_notices() {
+		global $post_type, $pagenow;
+
+		if ( isset( $_REQUEST['marked_completed'] ) || isset( $_REQUEST['marked_processing'] ) || isset( $_REQUEST['marked_on-hold'] ) ) {
+			$number = isset( $_REQUEST['changed'] ) ? absint( $_REQUEST['changed'] ) : 0;
+
+			if ( 'edit.php' == $pagenow && 'shop_order' == $post_type ) {
+				$message = sprintf( _n( 'Order status changed.', '%s order statuses changed.', $number ), number_format_i18n( $number ) );
+				echo '<div class="updated"><p>' . $message . '</p></div>';
+			}
 		}
 	}
 

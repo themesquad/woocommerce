@@ -3,7 +3,9 @@
 
 		<h4><?php _e( 'Product Data', 'woocommerce' ); ?></h4>
 
-		<?php if( get_option('woocommerce_enable_sku', true) !== 'no' ) : ?>
+		<?php do_action( 'woocommerce_product_quick_edit_start' ); ?>
+
+		<?php if ( wc_product_sku_enabled() ) : ?>
 
 			<label>
 			    <span class="title"><?php _e( 'SKU', 'woocommerce' ); ?></span>
@@ -74,10 +76,10 @@
 		</label>
 		<br class="clear" />
 
-		<?php if ( get_option('woocommerce_enable_weight') == "yes" || get_option('woocommerce_enable_dimensions') == "yes" ) : ?>
+		<?php if ( wc_product_weight_enabled() || wc_product_dimensions_enabled() ) : ?>
 		<div class="dimension_fields">
 
-			<?php if ( get_option('woocommerce_enable_weight') == "yes" ) : ?>
+			<?php if ( wc_product_weight_enabled() ) : ?>
 				<label>
 				    <span class="title"><?php _e( 'Weight', 'woocommerce' ); ?></span>
 				    <span class="input-text-wrap">
@@ -87,7 +89,7 @@
 				<br class="clear" />
 			<?php endif; ?>
 
-			<?php if ( get_option('woocommerce_enable_dimensions') == "yes" ) : ?>
+			<?php if ( wc_product_dimensions_enabled() ) : ?>
 				<div class="inline-edit-group dimensions">
 					<div>
 					    <span class="title"><?php _e( 'L/W/H', 'woocommerce' ); ?></span>
@@ -154,12 +156,14 @@
 				<label class="stock_qty_field">
 				    <span class="title"><?php _e( 'Stock Qty', 'woocommerce' ); ?></span>
 				    <span class="input-text-wrap">
-						<input type="text" name="_stock" class="text stock" value="">
+						<input type="number" name="_stock" class="text stock" step="any" value="">
 					</span>
 				</label>
 			<?php endif; ?>
 
 		</div>
+
+		<?php do_action( 'woocommerce_product_quick_edit_end' ); ?>
 
 		<input type="hidden" name="woocommerce_quick_edit" value="1" />
 		<input type="hidden" name="woocommerce_quick_edit_nonce" value="<?php echo wp_create_nonce( 'woocommerce_quick_edit_nonce' ); ?>" />

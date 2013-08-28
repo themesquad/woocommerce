@@ -29,12 +29,11 @@ class WC_Admin_Settings {
 		include_once( 'settings/class-wc-settings-page.php' );
 
 		$settings[] = include( 'settings/class-wc-settings-general.php' );
-		$settings[] = include( 'settings/class-wc-settings-pages.php' );
-		$settings[] = include( 'settings/class-wc-settings-catalog.php' );
-		$settings[] = include( 'settings/class-wc-settings-inventory.php' );
-		$settings[] = include( 'settings/class-wc-settings-tax.php' );
+		$settings[] = include( 'settings/class-wc-settings-products.php' );
+		$settings[] = include( 'settings/class-wc-settings-checkout.php' );
+		$settings[] = include( 'settings/class-wc-settings-accounts.php' );
 		$settings[] = include( 'settings/class-wc-settings-shipping.php' );
-		$settings[] = include( 'settings/class-wc-settings-gateways.php' );
+		$settings[] = include( 'settings/class-wc-settings-tax.php' );
 		$settings[] = include( 'settings/class-wc-settings-emails.php' );
 		$settings[] = include( 'settings/class-wc-settings-integrations.php' );
 
@@ -58,10 +57,11 @@ class WC_Admin_Settings {
 	    do_action( 'woocommerce_update_options' );
 
     	// Clear any unwanted data
-		WC()->get_helper( 'transient' )->clear_product_transients();
+		wc_delete_product_transients();
 		delete_transient( 'woocommerce_cache_excluded_uris' );
 
 		self::add_message( __( 'Your settings have been saved.', 'woocommerce' ) );
+		self::check_download_folder_protection();
 
 		do_action( 'woocommerce_settings_saved' );
 	}
@@ -454,13 +454,11 @@ class WC_Admin_Settings {
 
 	            	?><tr valign="top">
 						<th scope="row" class="titledesc"><?php echo esc_html( $value['title'] ) ?> <?php echo $tip; ?></th>
-	                    <td class="forminp">
+	                    <td class="forminp image_width_settings">
 
-	                    	<?php _e( 'Width', 'woocommerce' ); ?> <input name="<?php echo esc_attr( $value['id'] ); ?>[width]" id="<?php echo esc_attr( $value['id'] ); ?>-width" type="text" size="3" value="<?php echo $width; ?>" />
+	                    	<input name="<?php echo esc_attr( $value['id'] ); ?>[width]" id="<?php echo esc_attr( $value['id'] ); ?>-width" type="text" size="3" value="<?php echo $width; ?>" /> &times; <input name="<?php echo esc_attr( $value['id'] ); ?>[height]" id="<?php echo esc_attr( $value['id'] ); ?>-height" type="text" size="3" value="<?php echo $height; ?>" />px
 
-	                    	<?php _e( 'Height', 'woocommerce' ); ?> <input name="<?php echo esc_attr( $value['id'] ); ?>[height]" id="<?php echo esc_attr( $value['id'] ); ?>-height" type="text" size="3" value="<?php echo $height; ?>" />
-
-	                    	<label><?php _e( 'Hard Crop', 'woocommerce' ); ?> <input name="<?php echo esc_attr( $value['id'] ); ?>[crop]" id="<?php echo esc_attr( $value['id'] ); ?>-crop" type="checkbox" <?php echo $crop; ?> /></label>
+	                    	<label><input name="<?php echo esc_attr( $value['id'] ); ?>[crop]" id="<?php echo esc_attr( $value['id'] ); ?>-crop" type="checkbox" <?php echo $crop; ?> /> <?php _e( 'Hard Crop?', 'woocommerce' ); ?></label>
 
 	                    	</td>
 	                </tr><?php
@@ -520,7 +518,11 @@ class WC_Admin_Settings {
 
 	            	$selections = (array) self::get_option( $value['id'] );
 
-	            	$countries = WC()->countries->countries;
+	            	if ( ! empty( $value['options'] ) )
+	            		$countries = $value['options'];
+	            	else
+	            		$countries = WC()->countries->countries;
+
 	            	asort( $countries );
 	            	?><tr valign="top">
 						<th scope="row" class="titledesc">
@@ -534,7 +536,7 @@ class WC_Admin_Settings {
 					        			foreach ( $countries as $key => $val )
 		                    				echo '<option value="'.$key.'" ' . selected( in_array( $key, $selections ), true, false ).'>' . $val . '</option>';
 		                    	?>
-					        </select> <?php echo $description; ?> <br/><a class="select_all button" href="#"><?php _e( 'Select all', 'woocommerce' ); ?></a> <a class="select_none button" href="#"><?php _e( 'Select none', 'woocommerce' ); ?></a>
+					        </select> <?php if ( $description ) echo $description; ?> </br><a class="select_all button" href="#"><?php _e( 'Select all', 'woocommerce' ); ?></a> <a class="select_none button" href="#"><?php _e( 'Select none', 'woocommerce' ); ?></a>
 	               		</td>
 	               	</tr><?php
 	            break;
@@ -729,6 +731,39 @@ class WC_Admin_Settings {
 	    	update_option( $name, $value );
 
 	    return true;
+	}
+
+	/**
+	 * Checks which method we're using to serve downloads
+	 *
+	 * If using force or x-sendfile, this ensures the .htaccess is in place
+	 *
+	 * @access public
+	 * @return void
+	 */
+	public static function check_download_folder_protection() {
+		$upload_dir 		= wp_upload_dir();
+		$downloads_url 		= $upload_dir['basedir'] . '/woocommerce_uploads';
+		$download_method	= get_option('woocommerce_file_download_method');
+
+		if ( $download_method == 'redirect' ) {
+
+			// Redirect method - don't protect
+			if ( file_exists( $downloads_url . '/.htaccess' ) )
+				unlink( $downloads_url . '/.htaccess' );
+
+		} else {
+
+			// Force method - protect, add rules to the htaccess file
+			if ( ! file_exists( $downloads_url . '/.htaccess' ) ) {
+				if ( $file_handle = @fopen( $downloads_url . '/.htaccess', 'w' ) ) {
+					fwrite( $file_handle, 'deny from all' );
+					fclose( $file_handle );
+				}
+			}
+		}
+
+		flush_rewrite_rules();
 	}
 }
 

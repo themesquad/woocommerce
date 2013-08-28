@@ -37,6 +37,34 @@ class WC_Shortcodes {
 	}
 
 	/**
+	 * Shortcode Wrapper
+	 *
+	 * @param mixed $function
+	 * @param array $atts (default: array())
+	 * @return string
+	 */
+	public static function shortcode_wrapper(
+		$function,
+		$atts = array(),
+		$wrapper = array(
+			'class' => 'woocommerce',
+			'before' => null,
+			'after' => null
+		)
+	){
+		ob_start();
+
+		$before 	= empty( $wrapper['before'] ) ? '<div class="' . $wrapper['class'] . '">' : $wrapper['before'];
+		$after 		= empty( $wrapper['after'] ) ? '</div>' : $wrapper['after'];
+
+		echo $before;
+		call_user_func( $function, $atts );
+		echo $after;
+
+		return ob_get_clean();
+	}
+
+	/**
 	 * Cart page shortcode.
 	 *
 	 * @access public
@@ -44,8 +72,7 @@ class WC_Shortcodes {
 	 * @return string
 	 */
 	public function cart( $atts ) {
-		global $woocommerce;
-		return $woocommerce->get_helper( 'shortcode' )->shortcode_wrapper( array( 'WC_Shortcode_Cart', 'output' ), $atts );
+		return $this->shortcode_wrapper( array( 'WC_Shortcode_Cart', 'output' ), $atts );
 	}
 
 	/**
@@ -56,8 +83,7 @@ class WC_Shortcodes {
 	 * @return string
 	 */
 	public function checkout( $atts ) {
-		global $woocommerce;
-		return $woocommerce->get_helper( 'shortcode' )->shortcode_wrapper( array( 'WC_Shortcode_Checkout', 'output' ), $atts );
+		return $this->shortcode_wrapper( array( 'WC_Shortcode_Checkout', 'output' ), $atts );
 	}
 
 	/**
@@ -68,8 +94,7 @@ class WC_Shortcodes {
 	 * @return string
 	 */
 	public function order_tracking( $atts ) {
-		global $woocommerce;
-		return $woocommerce->get_helper( 'shortcode' )->shortcode_wrapper( array( 'WC_Shortcode_Order_Tracking', 'output' ), $atts );
+		return $this->shortcode_wrapper( array( 'WC_Shortcode_Order_Tracking', 'output' ), $atts );
 	}
 
 	/**
@@ -80,8 +105,7 @@ class WC_Shortcodes {
 	 * @return string
 	 */
 	public function my_account( $atts ) {
-		global $woocommerce;
-		return $woocommerce->get_helper( 'shortcode' )->shortcode_wrapper( array( 'WC_Shortcode_My_Account', 'output' ), $atts );
+		return $this->shortcode_wrapper( array( 'WC_Shortcode_My_Account', 'output' ), $atts );
 	}
 
 	/**
@@ -92,7 +116,7 @@ class WC_Shortcodes {
 	 * @return string
 	 */
 	public function product_category( $atts ){
-		global $woocommerce, $woocommerce_loop;
+		global $woocommerce_loop;
 
 	  	if ( empty( $atts ) ) return;
 
@@ -108,7 +132,7 @@ class WC_Shortcodes {
 		if ( ! $category ) return;
 
 		// Default ordering args
-		$ordering_args = $woocommerce->query->get_catalog_ordering_args( $orderby, $order );
+		$ordering_args = WC()->query->get_catalog_ordering_args( $orderby, $order );
 
 	  	$args = array(
 			'post_type'				=> 'product',
@@ -140,7 +164,7 @@ class WC_Shortcodes {
 
 	  	ob_start();
 
-		$products = new WP_Query( $args );
+		$products = new WP_Query( apply_filters( 'woocommerce_shortcode_products_query', $args, $atts ) );
 
 		$woocommerce_loop['columns'] = $columns;
 
@@ -160,7 +184,7 @@ class WC_Shortcodes {
 
 		wp_reset_postdata();
 
-		return '<div class="woocommerce">' . ob_get_clean() . '</div>';
+		return '<div class="woocommerce columns-' . $columns . '">' . ob_get_clean() . '</div>';
 	}
 
 
@@ -235,9 +259,8 @@ class WC_Shortcodes {
 
 		woocommerce_reset_loop();
 
-		return '<div class="woocommerce">' . ob_get_clean() . '</div>';
+		return '<div class="woocommerce columns-' . $columns . '">' . ob_get_clean() . '</div>';
 	}
-
 
 	/**
 	 * Recent Products shortcode
@@ -248,7 +271,7 @@ class WC_Shortcodes {
 	 */
 	public function recent_products( $atts ) {
 
-		global $woocommerce_loop, $woocommerce;
+		global $woocommerce_loop;
 
 		extract(shortcode_atts(array(
 			'per_page' 	=> '12',
@@ -257,7 +280,7 @@ class WC_Shortcodes {
 			'order' => 'desc'
 		), $atts));
 
-		$meta_query = $woocommerce->query->get_meta_query();
+		$meta_query = WC()->query->get_meta_query();
 
 		$args = array(
 			'post_type'	=> 'product',
@@ -271,7 +294,7 @@ class WC_Shortcodes {
 
 		ob_start();
 
-		$products = new WP_Query( $args );
+		$products = new WP_Query( apply_filters( 'woocommerce_shortcode_products_query', $args, $atts ) );
 
 		$woocommerce_loop['columns'] = $columns;
 
@@ -291,7 +314,7 @@ class WC_Shortcodes {
 
 		wp_reset_postdata();
 
-		return '<div class="woocommerce">' . ob_get_clean() . '</div>';
+		return '<div class="woocommerce columns-' . $columns . '">' . ob_get_clean() . '</div>';
 	}
 
 
@@ -347,7 +370,7 @@ class WC_Shortcodes {
 
 	  	ob_start();
 
-		$products = new WP_Query( $args );
+		$products = new WP_Query( apply_filters( 'woocommerce_shortcode_products_query', $args, $atts ) );
 
 		$woocommerce_loop['columns'] = $columns;
 
@@ -367,7 +390,7 @@ class WC_Shortcodes {
 
 		wp_reset_postdata();
 
-		return '<div class="woocommerce">' . ob_get_clean() . '</div>';
+		return '<div class="woocommerce columns-' . $columns . '">' . ob_get_clean() . '</div>';
 	}
 
 
@@ -409,7 +432,7 @@ class WC_Shortcodes {
 
 	  	ob_start();
 
-		$products = new WP_Query( $args );
+		$products = new WP_Query( apply_filters( 'woocommerce_shortcode_products_query', $args, $atts ) );
 
 		if ( $products->have_posts() ) : ?>
 
@@ -430,7 +453,6 @@ class WC_Shortcodes {
 		return '<div class="woocommerce">' . ob_get_clean() . '</div>';
 	}
 
-
 	/**
 	 * Display a single product price + cart button
 	 *
@@ -439,7 +461,7 @@ class WC_Shortcodes {
 	 * @return string
 	 */
 	public function product_add_to_cart( $atts ) {
-	  	global $wpdb, $woocommerce;
+	  	global $wpdb;
 
 	  	if ( empty( $atts ) ) return;
 
@@ -456,7 +478,7 @@ class WC_Shortcodes {
 
 		if ( 'product' == $product_data->post_type ) {
 
-			$product = $woocommerce->setup_product_data( $product_data );
+			$product = WC()->setup_product_data( $product_data );
 
 			ob_start();
 			?>
@@ -511,7 +533,6 @@ class WC_Shortcodes {
 		}
 	}
 
-
 	/**
 	 * Get the add to cart URL for a product
 	 *
@@ -548,7 +569,7 @@ class WC_Shortcodes {
 	 * @return string
 	 */
 	public function sale_products( $atts ){
-	    global $woocommerce_loop, $woocommerce;
+	    global $woocommerce_loop;
 
 	    extract( shortcode_atts( array(
 	        'per_page'      => '12',
@@ -561,8 +582,8 @@ class WC_Shortcodes {
 		$product_ids_on_sale = woocommerce_get_product_ids_on_sale();
 
 		$meta_query = array();
-		$meta_query[] = $woocommerce->query->visibility_meta_query();
-	    $meta_query[] = $woocommerce->query->stock_status_meta_query();
+		$meta_query[] = WC()->query->visibility_meta_query();
+	    $meta_query[] = WC()->query->stock_status_meta_query();
 	    $meta_query   = array_filter( $meta_query );
 
 		$args = array(
@@ -578,7 +599,7 @@ class WC_Shortcodes {
 
 	  	ob_start();
 
-		$products = new WP_Query( $args );
+		$products = new WP_Query( apply_filters( 'woocommerce_shortcode_products_query', $args, $atts ) );
 
 		$woocommerce_loop['columns'] = $columns;
 
@@ -598,7 +619,7 @@ class WC_Shortcodes {
 
 		wp_reset_postdata();
 
-		return '<div class="woocommerce">' . ob_get_clean() . '</div>';
+		return '<div class="woocommerce columns-' . $columns . '">' . ob_get_clean() . '</div>';
 	}
 
 	/**
@@ -634,7 +655,7 @@ class WC_Shortcodes {
 
 	  	ob_start();
 
-		$products = new WP_Query( $args );
+		$products = new WP_Query( apply_filters( 'woocommerce_shortcode_products_query', $args, $atts ) );
 
 		$woocommerce_loop['columns'] = $columns;
 
@@ -654,7 +675,7 @@ class WC_Shortcodes {
 
 		wp_reset_postdata();
 
-		return '<div class="woocommerce">' . ob_get_clean() . '</div>';
+		return '<div class="woocommerce columns-' . $columns . '">' . ob_get_clean() . '</div>';
 	}
 
 	/**
@@ -694,7 +715,7 @@ class WC_Shortcodes {
 
 	  	add_filter( 'posts_clauses', array( &$this, 'order_by_rating_post_clauses' ) );
 
-		$products = new WP_Query( $args );
+		$products = new WP_Query( apply_filters( 'woocommerce_shortcode_products_query', $args, $atts ) );
 
 		remove_filter( 'posts_clauses', array( &$this, 'order_by_rating_post_clauses' ) );
 
@@ -716,7 +737,7 @@ class WC_Shortcodes {
 
 		wp_reset_postdata();
 
-		return '<div class="woocommerce">' . ob_get_clean() . '</div>';
+		return '<div class="woocommerce columns-' . $columns . '">' . ob_get_clean() . '</div>';
 	}
 
 	/**
@@ -759,7 +780,7 @@ class WC_Shortcodes {
 
 		ob_start();
 
-		$products = new WP_Query( $args );
+		$products = new WP_Query( apply_filters( 'woocommerce_shortcode_products_query', $args, $atts ) );
 
 		$woocommerce_loop['columns'] = $columns;
 
@@ -779,7 +800,7 @@ class WC_Shortcodes {
 
 		wp_reset_postdata();
 
-		return '<div class="woocommerce">' . ob_get_clean() . '</div>';
+		return '<div class="woocommerce columns-' . $columns . '">' . ob_get_clean() . '</div>';
 	}
 
 
@@ -897,7 +918,6 @@ class WC_Shortcodes {
 		), $atts ) );
 
 		$attribute 	= strstr( $attribute, 'pa_' ) ? sanitize_title( $attribute ) : 'pa_' . sanitize_title( $attribute );
-		$filter 	= sanitize_title( $filter );
 
 		$args = array(
 			'post_type'           => 'product',
@@ -916,7 +936,7 @@ class WC_Shortcodes {
 			'tax_query' 			=> array(
 				array(
 					'taxonomy' 	=> $attribute,
-					'terms' 	=> $filter,
+					'terms'     => array_map( 'sanitize_title', explode( ",", $filter ) ),
 					'field' 	=> 'slug'
 				)
 			)
@@ -924,7 +944,7 @@ class WC_Shortcodes {
 
 		ob_start();
 
-		$products = new WP_Query( $args );
+		$products = new WP_Query( apply_filters( 'woocommerce_shortcode_products_query', $args, $atts ) );
 
 		$woocommerce_loop['columns'] = $columns;
 

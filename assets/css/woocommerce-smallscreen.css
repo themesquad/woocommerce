@@ -80,14 +80,24 @@
 .woocommerce #content table.cart td.actions .coupon,
 .woocommerce-page #content table.cart td.actions .coupon {
   float: none;
+  *zoom: 1;
   padding-bottom: .5em;
+}
+.woocommerce table.cart td.actions .coupon:before,
+.woocommerce-page table.cart td.actions .coupon:before,
+.woocommerce #content table.cart td.actions .coupon:before,
+.woocommerce-page #content table.cart td.actions .coupon:before,
+.woocommerce table.cart td.actions .coupon:after,
+.woocommerce-page table.cart td.actions .coupon:after,
+.woocommerce #content table.cart td.actions .coupon:after,
+.woocommerce-page #content table.cart td.actions .coupon:after {
+  content: " ";
+  display: table;
 }
 .woocommerce table.cart td.actions .coupon:after,
 .woocommerce-page table.cart td.actions .coupon:after,
 .woocommerce #content table.cart td.actions .coupon:after,
 .woocommerce-page #content table.cart td.actions .coupon:after {
-  content: "";
-  display: block;
   clear: both;
 }
 .woocommerce table.cart td.actions input,

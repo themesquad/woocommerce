@@ -20,8 +20,7 @@ class WC_Shortcode_Checkout {
 	 * @return string
 	 */
 	public static function get( $atts ) {
-		global $woocommerce;
-		return $woocommerce->get_helper( 'shortcode' )->shortcode_wrapper( array( __CLASS__, 'output' ), $atts );
+		return WC_Shortcodes::shortcode_wrapper( array( __CLASS__, 'output' ), $atts );
 	}
 
 	/**
@@ -67,7 +66,7 @@ class WC_Shortcode_Checkout {
 	/**
 	 * Show the pay page
 	 */
-	private function order_pay( $order_id ) {
+	private static function order_pay( $order_id ) {
 		global $woocommerce;
 
 		do_action( 'before_woocommerce_pay' );
@@ -172,7 +171,7 @@ class WC_Shortcode_Checkout {
 	/**
 	 * Show the thanks page
 	 */
-	private function order_received( $order_id = 0 ) {
+	private static function order_received( $order_id = 0 ) {
 		global $woocommerce;
 
 		wc_print_messages();
@@ -198,7 +197,7 @@ class WC_Shortcode_Checkout {
 	/**
 	 * Show the checkout
 	 */
-	private function checkout() {
+	private static function checkout() {
 		global $woocommerce;
 
 		// Show non-cart errors

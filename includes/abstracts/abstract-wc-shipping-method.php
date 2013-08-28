@@ -162,11 +162,10 @@ abstract class WC_Shipping_Method extends WC_Settings_API {
     /**
      * is_available function.
      *
-     * @access public
      * @param array $package
      * @return bool
      */
-    function is_available( $package ) {
+    public function is_available( $package ) {
     	global $woocommerce;
 
     	if ( $this->enabled == "no" )
@@ -175,19 +174,22 @@ abstract class WC_Shipping_Method extends WC_Settings_API {
 		if ( isset( $woocommerce->cart->cart_contents_total ) && isset( $this->min_amount ) && $this->min_amount && $this->min_amount > $woocommerce->cart->cart_contents_total )
 			return false;
 
-		$ship_to_countries = '';
+		// Country availability
+		switch ( $this->availability ) {
+			case 'specific' :
+			case 'including' :
+				$ship_to_countries = array_intersect( $this->countries, array_keys( $woocommerce->countries->get_shipping_countries() ) );
+			break;
+			case 'excluding' :
+				$ship_to_countries = array_diff( $this->countries, array_keys( $woocommerce->countries->get_shipping_countries() ) );
+			break;
+			default :
+				$ship_to_countries = array_keys( $woocommerce->countries->get_shipping_countries() );
+			break;
+		}
 
-		if ( $this->availability == 'specific' ) :
-			$ship_to_countries = $this->countries;
-		else :
-			if ( get_option( 'woocommerce_allowed_countries' ) == 'specific' ) :
-				$ship_to_countries = get_option( 'woocommerce_specific_allowed_countries' );
-			endif;
-		endif;
-
-		if ( is_array( $ship_to_countries ) ) :
-			if ( ! in_array( $package['destination']['country'], $ship_to_countries ) ) return false;
-		endif;
+		if ( ! in_array( $package['destination']['country'], $ship_to_countries ) )
+			return false;
 
 		return apply_filters( 'woocommerce_shipping_' . $this->id . '_is_available', true, $package );
     }
@@ -195,13 +197,11 @@ abstract class WC_Shipping_Method extends WC_Settings_API {
 	/**
 	 * Return the gateways title
 	 *
-	 * @access public
-	 * @return void
+	 * @return string
 	 */
-	function get_title() {
+	public function get_title() {
 		return apply_filters( 'woocommerce_shipping_method_title', $this->title, $this->id );
 	}
-
 
     /**
      * get_fee function.

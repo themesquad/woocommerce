@@ -26,6 +26,16 @@ class WC_Admin_CPT_Product extends WC_Admin_CPT {
 	public function __construct() {
 		$this->type = 'product';
 
+		// Post title fields
+		add_filter( 'enter_title_here', array( $this, 'enter_title_here' ), 1, 2 );
+
+		// Visibility option
+		add_action( 'post_submitbox_misc_actions', array( $this, 'product_data_visibility' ) );
+
+		// Before data updates
+		add_action( 'pre_post_update', array( $this, 'pre_post_update' ) );
+		add_filter( 'wp_insert_post_data', array( $this, 'wp_insert_post_data' ) );
+
 		// Admin Columns
 		add_filter( 'manage_edit-product_columns', array( $this, 'edit_columns' ) );
 		add_action( 'manage_product_posts_custom_column', array( $this, 'custom_columns' ), 2 );
@@ -50,10 +60,121 @@ class WC_Admin_CPT_Product extends WC_Admin_CPT {
 		add_action( 'quick_edit_custom_box',  array( $this, 'quick_edit' ), 10, 2 );
 		add_action( 'save_post', array( $this, 'bulk_and_quick_edit_save_post' ), 10, 2 );
 
+		// Uploads
+		add_filter( 'upload_dir', array( $this, 'upload_dir' ) );
+		add_action( 'media_upload_downloadable_product', array( $this, 'media_upload_downloadable_product' ) );
+		add_filter( 'mod_rewrite_rules', array( $this, 'ms_protect_download_rewite_rules' ) );
+
+		// Download permissions
+		add_action( 'woocommerce_process_product_file_download_paths', array( $this, 'process_product_file_download_paths' ), 10, 3 );
+
 		// Call WC_Admin_CPT constructor
 		parent::__construct();
 	}
 
+	/**
+	 * Change title boxes in admin.
+	 * @param  string $text
+	 * @param  object $post
+	 * @return string
+	 */
+	public function enter_title_here( $text, $post ) {
+		if ( $post->post_type == 'product' )
+			return __( 'Product name', 'woocommerce' );
+
+		return $text;
+	}
+
+	/**
+	 * Output product visibility options.
+	 *
+	 * @access public
+	 * @return void
+	 */
+	public function product_data_visibility() {
+		global $post;
+
+		if ( $post->post_type != 'product' )
+			return;
+
+		$current_visibility = ( $current_visibility = get_post_meta( $post->ID, '_visibility', true ) ) ? $current_visibility : 'visible';
+		$current_featured 	= ( $current_featured = get_post_meta( $post->ID, '_featured', true ) ) ? $current_featured : 'no';
+
+		$visibility_options = apply_filters( 'woocommerce_product_visibility_options', array(
+			'visible' 	=> __( 'Catalog/search', 'woocommerce' ),
+			'catalog' 	=> __( 'Catalog', 'woocommerce' ),
+			'search' 	=> __( 'Search', 'woocommerce' ),
+			'hidden' 	=> __( 'Hidden', 'woocommerce' )
+		) );
+		?>
+		<div class="misc-pub-section" id="catalog-visibility">
+			<?php _e( 'Catalog visibility:', 'woocommerce' ); ?> <strong id="catalog-visibility-display"><?php
+				echo isset( $visibility_options[ $current_visibility ]  ) ? esc_html( $visibility_options[ $current_visibility ] ) : esc_html( $current_visibility );
+
+				if ( $current_featured == 'yes' )
+					echo ', ' . __( 'Featured', 'woocommerce' );
+			?></strong>
+
+			<a href="#catalog-visibility" class="edit-catalog-visibility hide-if-no-js"><?php _e( 'Edit', 'woocommerce' ); ?></a>
+
+			<div id="catalog-visibility-select" class="hide-if-js">
+
+				<input type="hidden" name="current_visibility" id="current_visibility" value="<?php echo esc_attr( $current_visibility ); ?>" />
+				<input type="hidden" name="current_featured" id="current_featured" value="<?php echo esc_attr( $current_featured ); ?>" />
+
+				<?php
+					echo '<p>' . __( 'Define the loops this product should be visible in. The product will still be accessible directly.', 'woocommerce' ) . '</p>';
+
+					foreach ( $visibility_options as $name => $label ) {
+						echo '<input type="radio" name="_visibility" id="_visibility_' . esc_attr( $name ) . '" value="' . esc_attr( $name ) . '" ' . checked( $current_visibility, $name, false ) . ' data-label="' . esc_attr( $label ) . '" /> <label for="_visibility_' . esc_attr( $name ) . '" class="selectit">' . esc_html( $label ) . '</label><br />';
+					}
+
+					echo '<p>' . __( 'Enable this option to feature this product.', 'woocommerce' ) . '</p>';
+
+					echo '<input type="checkbox" name="_featured" id="_featured" ' . checked( $current_featured, 'yes', false ) . ' /> <label for="_featured">' . __( 'Featured Product', 'woocommerce' ) . '</label><br />';
+				?>
+				<p>
+					<a href="#catalog-visibility" class="save-post-visibility hide-if-no-js button"><?php _e( 'OK', 'woocommerce' ); ?></a>
+					<a href="#catalog-visibility" class="cancel-post-visibility hide-if-no-js"><?php _e( 'Cancel', 'woocommerce' ); ?></a>
+				</p>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Some functions, like the term recount, require the visibility to be set prior. Lets save that here.
+	 *
+	 * @param int $post_id
+	 */
+	public function pre_post_update( $post_id ) {
+		if ( isset( $_POST['_visibility'] ) )
+			update_post_meta( $post_id, '_visibility', stripslashes( $_POST['_visibility'] ) );
+		if ( isset( $_POST['_stock_status'] ) )
+			wc_update_product_stock_status( $post_id, woocommerce_clean( $_POST['_stock_status'] ) );
+	}
+
+	/**
+	 * Forces certain product data based on the product's type, e.g. grouped products cannot have a parent.
+	 *
+	 * @param array $data
+	 * @return array
+	 */
+	public function wp_insert_post_data( $data ) {
+		global $post;
+
+		if ( $data['post_type'] == 'product' && isset( $_POST['product-type'] ) ) {
+			$product_type = stripslashes( $_POST['product-type'] );
+			switch( $product_type ) :
+				case "grouped" :
+				case "variable" :
+					$data['post_parent'] = 0;
+				break;
+			endswitch;
+		}
+
+		return $data;
+	}
 
 	/**
 	 * Change the columns shown in admin.
@@ -72,7 +193,7 @@ class WC_Admin_CPT_Product extends WC_Admin_CPT {
 
 		$columns["name"] = __( 'Name', 'woocommerce' );
 
-		if ( get_option( 'woocommerce_enable_sku', true ) == 'yes' )
+		if ( wc_product_sku_enabled() )
 			$columns["sku"] = __( 'SKU', 'woocommerce' );
 
 		if ( get_option( 'woocommerce_manage_stock' ) == 'yes' )
@@ -545,7 +666,7 @@ class WC_Admin_CPT_Product extends WC_Admin_CPT {
 			$this->bulk_edit_save( $post_id, $product );
 
 		// Clear transient
-		$woocommerce->get_helper( 'transient' )->clear_product_transients( $post_id );
+		wc_delete_product_transients( $post_id );
 	}
 
 	/**
@@ -562,7 +683,6 @@ class WC_Admin_CPT_Product extends WC_Admin_CPT {
 		if ( isset( $_REQUEST['_length'] ) ) update_post_meta( $post_id, '_length', woocommerce_clean( $_REQUEST['_length'] ) );
 		if ( isset( $_REQUEST['_width'] ) ) update_post_meta( $post_id, '_width', woocommerce_clean( $_REQUEST['_width'] ) );
 		if ( isset( $_REQUEST['_height'] ) ) update_post_meta( $post_id, '_height', woocommerce_clean( $_REQUEST['_height'] ) );
-		if ( isset( $_REQUEST['_stock_status'] ) ) update_post_meta( $post_id, '_stock_status', woocommerce_clean( $_REQUEST['_stock_status'] ) );
 		if ( isset( $_REQUEST['_visibility'] ) ) update_post_meta( $post_id, '_visibility', woocommerce_clean( $_REQUEST['_visibility'] ) );
 		if ( isset( $_REQUEST['_featured'] ) ) update_post_meta( $post_id, '_featured', 'yes' ); else update_post_meta( $post_id, '_featured', 'no' );
 
@@ -595,14 +715,18 @@ class WC_Admin_CPT_Product extends WC_Admin_CPT {
 			}
 		}
 
+		// Handle stock status
+		if ( isset( $_REQUEST['_stock_status'] ) )
+			wc_update_product_stock_status( $post_id, woocommerce_clean( $_REQUEST['_stock_status'] ) );
+
 		// Handle stock
 		if ( ! $product->is_type('grouped') ) {
 			if ( isset( $_REQUEST['_manage_stock'] ) ) {
 				update_post_meta( $post_id, '_manage_stock', 'yes' );
-				update_post_meta( $post_id, '_stock', (int) $_REQUEST['_stock'] );
+				wc_update_product_stock( $post_id, intval( $_REQUEST['_stock'] ) );
 			} else {
 				update_post_meta( $post_id, '_manage_stock', 'no' );
-				update_post_meta( $post_id, '_stock', '0' );
+				wc_update_product_stock( $post_id, 0 );
 			}
 		}
 
@@ -641,7 +765,7 @@ class WC_Admin_CPT_Product extends WC_Admin_CPT {
 		}
 
 		if ( ! empty( $_REQUEST['_stock_status'] ) )
-			update_post_meta( $post_id, '_stock_status', stripslashes( $_REQUEST['_stock_status'] ) );
+			wc_update_product_stock_status( $post_id, woocommerce_clean( $_REQUEST['_stock_status'] ) );
 
 		if ( ! empty( $_REQUEST['_visibility'] ) )
 			update_post_meta( $post_id, '_visibility', stripslashes( $_REQUEST['_visibility'] ) );
@@ -751,8 +875,8 @@ class WC_Admin_CPT_Product extends WC_Admin_CPT {
 		if ( ! $product->is_type( 'grouped' ) ) {
 
 			if ( ! empty( $_REQUEST['change_stock'] ) ) {
-				update_post_meta( $post_id, '_stock', (int) $_REQUEST['_stock'] );
 				update_post_meta( $post_id, '_manage_stock', 'yes' );
+				wc_update_product_stock( $post_id, intval( $_REQUEST['_stock'] ) );
 			}
 
 			if ( ! empty( $_REQUEST['_manage_stock'] ) ) {
@@ -761,13 +885,101 @@ class WC_Admin_CPT_Product extends WC_Admin_CPT {
 					update_post_meta( $post_id, '_manage_stock', 'yes' );
 				} else {
 					update_post_meta( $post_id, '_manage_stock', 'no' );
-					update_post_meta( $post_id, '_stock', '0' );
+					wc_update_product_stock( $post_id, 0 );
 				}
 			}
 
 		}
 
 		do_action( 'woocommerce_product_bulk_edit_save', $product );
+	}
+
+	/**
+	 * Filter the directory for uploads.
+	 *
+	 * @param array $pathdata
+	 * @return array
+	 */
+	public function upload_dir( $pathdata ) {
+		// Change upload dir
+		if ( isset( $_POST['type'] ) && $_POST['type'] == 'downloadable_product' ) {
+			// Uploading a downloadable file
+			$subdir = '/woocommerce_uploads'.$pathdata['subdir'];
+		 	$pathdata['path'] = str_replace($pathdata['subdir'], $subdir, $pathdata['path']);
+		 	$pathdata['url'] = str_replace($pathdata['subdir'], $subdir, $pathdata['url']);
+			$pathdata['subdir'] = str_replace($pathdata['subdir'], $subdir, $pathdata['subdir']);
+			return $pathdata;
+		}
+
+		return $pathdata;
+	}
+
+	/**
+	 * Run a filter when uploading a downloadable product.
+	 */
+	public function woocommerce_media_upload_downloadable_product() {
+		do_action('media_upload_file');
+	}
+
+	/**
+	 * Protect downlodas from ms-files.php in multisite
+	 *
+	 * @param mixed $rewrite
+	 * @return string
+	 */
+	public function ms_protect_download_rewite_rules( $rewrite ) {
+	    global $wp_rewrite;
+
+	    if ( ! is_multisite() || get_option( 'woocommerce_file_download_method' ) == 'redirect' )
+	    	return $rewrite;
+
+		$rule  = "\n# WooCommerce Rules - Protect Files from ms-files.php\n\n";
+		$rule .= "<IfModule mod_rewrite.c>\n";
+		$rule .= "RewriteEngine On\n";
+		$rule .= "RewriteCond %{QUERY_STRING} file=woocommerce_uploads/ [NC]\n";
+		$rule .= "RewriteRule /ms-files.php$ - [F]\n";
+		$rule .= "</IfModule>\n\n";
+
+		return $rule . $rewrite;
+	}
+
+	/**
+	 * Grant downloadable file access to any newly added files on any existing
+	 * orders for this product that have previously been granted downloadable file access
+	 *
+	 * @access public
+	 * @param int $product_id product identifier
+	 * @param int $variation_id optional product variation identifier
+	 * @param array $file_paths newly set file paths
+	 */
+	public function process_product_file_download_paths( $product_id, $variation_id, $file_paths ) {
+		global $wpdb;
+
+		if ( $variation_id )
+			$product_id = $variation_id;
+
+		// determine whether any new files have been added
+		$existing_file_paths = apply_filters( 'woocommerce_file_download_paths', get_post_meta( $product_id, '_file_paths', true ), $product_id, null, null );
+		if ( ! $existing_file_paths ) $existing_file_paths = array();
+
+		$new_download_ids = array_diff( array_keys( (array) $file_paths ), array_keys( (array) $existing_file_paths ) );
+
+		if ( $new_download_ids ) {
+			// determine whether downloadable file access has been granted (either via the typical order completion, or via the admin ajax method)
+			$existing_permissions = $wpdb->get_results( $wpdb->prepare( "SELECT * from {$wpdb->prefix}woocommerce_downloadable_product_permissions WHERE product_id = %d GROUP BY order_id", $product_id ) );
+			foreach ( $existing_permissions as $existing_permission ) {
+				$order = new WC_Order( $existing_permission->order_id );
+
+				if ( $order->id ) {
+					foreach ( $new_download_ids as $new_download_id ) {
+						// grant permission if it doesn't already exist
+						if ( ! $wpdb->get_var( $wpdb->prepare( "SELECT true FROM {$wpdb->prefix}woocommerce_downloadable_product_permissions WHERE order_id = %d AND product_id = %d AND download_id = %s", $order->id, $product_id, $new_download_id ) ) ) {
+							woocommerce_downloadable_file_permission( $new_download_id, $product_id, $order );
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
